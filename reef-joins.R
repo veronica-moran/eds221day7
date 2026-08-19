@@ -26,9 +26,79 @@ coral_depth <- moorea_coral |>
 
 coral_depth_Y <- coral_depth |>
   mutate(
-    Year = as.integer(str_sub(Date, start = 1L, end = 4L))
+    Year = as.numeric(str_sub(Date, 1L, 4L))
   )
 
-#Use mutate(), str_sub(), and as.numeric() to pull the four-digit
-# year out of Date (which is formatted "YYYY-MM")
-# into a new column called Year.Year=str_sub(Year, (start = 1L, stop = 4L))
+glimpse(coral_depth_Y)
+
+coral_quadrat <- coral_depth_Y |>
+  summarize(
+    quadrat_cover = sum(Percent_Cover, na.rm = TRUE),
+    .by = c(Year, Site, Habitat, Depth, Quad40)
+  )
+mean_coral_cover <- coral_quadrat |>
+  summarize(
+    mean_coral_cover = mean(quadrat_cover, na.rm = TRUE),
+    .by = c(Year, Site, Habitat, Depth)
+  )
+
+coral_summary <- mean_coral_cover |>
+  arrange(Year, Site, Depth)
+
+
+primary_consumer <- moorea_fish |>
+  filter(Coarse_Trophic == "Primary Consumer")
+
+
+fish_summary <- primary_consumer |>
+  summarize(
+    total_biomass = sum(Biomass, na.rm = TRUE),
+    .by = c(Site, Habitat, Year)
+  )
+
+reef_joined <- inner_join(
+  coral_summary,
+  fish_summary,
+  by = c("Site", "Habitat", "Year")
+)
+
+
+nrow(coral_summary)
+nrow(fish_summary)
+nrow(reef_joined)
+
+
+reef_wide <- reef_joined |>
+  select(Site, Habitat, Year, mean_coral_cover) |>
+  pivot_wider(
+    names_from = Habitat,
+    values_from = mean_coral_cover
+  )
+
+reef_wide <- reef_wide |>
+  mutate(
+    cover_difference = Fringing - Forereef
+  )
+
+
+glimpse(reef_wide)
+
+ggplot(
+  data = reef_wide,
+  mapping = aes(x = cover_difference)
+) +
+  geom_histogram()
+
+
+ggplot(
+  data = reef_joined,
+  mapping = aes(
+    x = mean_coral_cover,
+    y = total_biomass
+  )
+) +
+  geom_point() +
+  labs(
+    x = "Mean Coral Cover",
+    y = "Herbivorous Fish Biomass"
+  )
